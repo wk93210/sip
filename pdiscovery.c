@@ -189,7 +189,7 @@ cache_search(struct discovery_cache *cache,
         break;
       }
     } else {
-      // remove expired item
+      /* Remove expired item */
       AST_LIST_REMOVE_CURRENT(entry);
       cache_item_free(item);
     }
@@ -302,7 +302,6 @@ static char *pdiscovery_port(const char *name, int len, const char *subdir) {
 
   if (stat(name2, &statb) == 0 && S_ISDIR(statb.st_mode) &&
       pdiscovery_is_port(name2, len2)) {
-    //dentry->d_name);
     BUILD_NAME("/dev", subdir, 4, len3, name3);
     port = ast_strdup(name3);
   }
@@ -333,7 +332,6 @@ static char *pdiscovery_interface(const char *name, int len,
                                   unsigned *interface) {
   char *port = NULL;
   if (pdiscovery_get_id(name, len, "bInterfaceNumber", interface) == 1) {
-    //*interface);
     port = pdiscovery_port_name(name, len);
   }
   return port;
@@ -687,7 +685,6 @@ static int pdiscovery_check_device(const char *name, int len,
 
   device = pdiscovery_lookup_ids(req->name, name2, len2);
   if (device) {
-    //%04x:%04x modem=%02x voice=%02x data=%02x\n",
     ast_debug(4,
               "[%s discovery] should ports <-> interfaces map for %04x:%04x "
               "voice=%02x data=%02x\n",

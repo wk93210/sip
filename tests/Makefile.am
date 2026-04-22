@@ -2,23 +2,26 @@
 
 noinst_PROGRAMS = test_at_parse
 
-test_at_parse_SOURCES = test_at_parse.c
+test_at_parse_SOURCES = \
+	test_at_parse.c \
+	$(top_srcdir)/at_parse.c \
+	$(top_srcdir)/char_conv.c \
+	$(top_srcdir)/pdu.c \
+	$(top_srcdir)/memmem.c
 
 test_at_parse_CFLAGS = \
 	-O2 -g -Wall -std=gnu11 \
 	-D_GNU_SOURCE \
+	-DHAVE_CONFIG_H \
+	-DAST_MODULE_SELF_SYM=__internal_test_self \
 	-I$(top_srcdir) \
+	-include $(top_srcdir)/preinclude.h \
 	$(SQLITE3_CFLAGS) \
-	-I$(ASTERISK_INCLUDE_DIR)
+	-idirafter $(ASTERISK_INCLUDE_DIR)/asterisk
 
 test_at_parse_LDADD = \
-	$(top_builddir)/at_parse.o \
-	$(top_builddir)/char_conv.o \
-	$(top_builddir)/pdu.o \
-	$(top_builddir)/memmem.o \
-	$(SQLITE3_LIBS)
-
-test_at_parse_LDFLAGS = -lpthread
+	$(SQLITE3_LIBS) \
+	-lpthread
 
 # Test target
 check: test_at_parse

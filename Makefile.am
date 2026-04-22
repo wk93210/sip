@@ -81,7 +81,7 @@ chan_dongle_la_CFLAGS = \
 	-include $(top_srcdir)/preinclude.h \
 	$(SQLITE3_CFLAGS) \
 	$(ICONV_CFLAGS) \
-	-idirafter $(ASTERISK_INCLUDE_DIR)
+	-idirafter $(ASTERISK_INCLUDE_DIR)/asterisk
 
 # Linker flags
 chan_dongle_la_LDFLAGS = \

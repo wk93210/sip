@@ -26,7 +26,6 @@
 #include "dc_config.h" /* pvt_config_t */
 #include "export.h"    /* EXPORT_DECL EXPORT_DEF */
 
-#define MODULE_DESCRIPTION "Huawei 3G Dongle Channel Driver"
 #define MAXDONGLEDEVICES 128
 
 INLINE_DECL const char *dev_state2str(dev_state_t state) {
