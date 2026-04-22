@@ -16,6 +16,7 @@
 #include "mutils.h"      /* ITEMS_OF() */
 #include "pdiscovery.h"  /* pdiscovery_lookup()  */
 #include "ringbuffer.h"  /* struct ringbuffer */
+#include "asterisk/logger.h" /* ast_log() */
 
 /*
 static const char sys_bus_usb_drivers_usb[] = "/sys/bus/usb/drivers/usb";
