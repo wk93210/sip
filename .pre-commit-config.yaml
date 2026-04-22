@@ -7,9 +7,9 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
-        exclude: '\.(md|txt|in|m4)$|^configure$|^compile$|^config\.(guess|sub)$|^depcomp$|^install-sh$|^ltmain\.sh$|^missing$|^test-driver$|^Makefile$'
+        exclude: '\.(md|txt|in|m4)$|(^|/)configure$|(^|/)compile$|(^|/)config\.(guess|sub)$|(^|/)depcomp$|(^|/)install-sh$|(^|/)ltmain\.sh$|(^|/)missing$|(^|/)test-driver$|(^|/)Makefile$'
       - id: end-of-file-fixer
-        exclude: '\.(md|txt|in|m4)$|^configure$|^compile$|^config\.(guess|sub)$|^depcomp$|^install-sh$|^ltmain\.sh$|^missing$|^test-driver$|^Makefile$'
+        exclude: '\.(md|txt|in|m4)$|(^|/)configure$|(^|/)compile$|(^|/)config\.(guess|sub)$|(^|/)depcomp$|(^|/)install-sh$|(^|/)ltmain\.sh$|(^|/)missing$|(^|/)test-driver$|(^|/)Makefile$'
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
