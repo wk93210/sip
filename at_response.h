@@ -63,6 +63,8 @@ struct iovec;
 \
 	_( CLCC,        "+CLCC",        "+CLCC:") \
 	_( CCWA,        "+CCWA",        "+CCWA:") \
+	_( VOICE_CALL_B, "VOICE CALL",   "VOICE CALL: BEGIN") \
+	_( VOICE_CALL_E, "VOICE CALL END", "VOICE CALL: END") \
 /* AT_RESPONSES_TABLE */
 
 
@@ -75,7 +77,7 @@ typedef enum {
 
 	/* Hackish way to maintain MAX and MIN responses for compatibility */
 	RES_MIN = RES_PARSE_ERROR,
-	RES_MAX = RES_CCWA,
+	RES_MAX = RES_VOICE_CALL_E,
 } at_res_t;
 
 /*! response description */
