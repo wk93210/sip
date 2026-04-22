@@ -365,13 +365,16 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 			/* These two are expected to be called in order */
 			case CMD_AT_CVOICE:
 				ast_debug(1, "[%s] Dongle has NO (CVOICE) voice support\n", PVT_ID(pvt));
-				pvt->has_voice = 0;
+				/* SIMCOM/SIM7600 doesn't support AT^CVOICE but has voice support */
+				if (strstr(pvt->manufacturer, "SIMCOM") == NULL && strstr(pvt->manufacturer, "SimTech") == NULL) {
+					pvt->has_voice = 0;
+				}
 				break;
 			case CMD_AT_QPCMV:
 				ast_debug(1, "[%s] Dongle has NO (QPCMV) voice support\n", PVT_ID(pvt));
 				pvt->has_voice_quectel = 0;
 
-				if (pvt->has_voice == 0) {
+				if (pvt->has_voice == 0 && strstr(pvt->manufacturer, "SIMCOM") == NULL && strstr(pvt->manufacturer, "SimTech") == NULL) {
 					ast_log(LOG_WARNING, "[%s] Dongle has NO voice support\n", PVT_ID(pvt));
 				}
 				break;
@@ -1682,6 +1685,13 @@ static int at_response_creg (struct pvt* pvt, char* str, size_t len)
 static int at_response_cgmi (struct pvt* pvt, const char* str)
 {
 	ast_copy_string (pvt->manufacturer, str, sizeof (pvt->manufacturer));
+
+	/* SIM7600/SIMCOM modules have voice support but do not support AT^CVOICE */
+	if (strstr(str, "SIMCOM") != NULL || strstr(str, "SimTech") != NULL) {
+		ast_log(LOG_NOTICE, "[%s] SIMCOM/SimTech detected, enabling voice support\n", PVT_ID(pvt));
+		pvt->has_voice = 1;
+		pvt->has_voice_quectel = 0;
+	}
 
 	return 0;
 }
