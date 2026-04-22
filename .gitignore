@@ -2,15 +2,39 @@
 *.o
 *.so
 *.a
+*.la
+*.lo
+.libs/
+.deps/
+
+# Autotools generated (keep these in repo for convenience)
+# Makefile (generated from Makefile.am - but we keep a static Makefile for simplicity)
+# configure (generated from configure.ac)
+# Makefile.in
+# aclocal.m4
+# config.h.in
+# compile
+# config.guess
+# config.sub
+# depcomp
+# install-sh
+# ltmain.sh
+# missing
+
+# Build generated files
+config.h
+config.log
+config.status
+stamp-h1
+libtool
+*.tar.gz
+*.tar.bz2
+*.tar.xz
 
 # Backup files
 *.bak
 *.orig
 *~
-
-# Generated config
-config.h
-config.log
 
 # IDE
 .vscode/
@@ -29,3 +53,12 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+# Test binaries
+tests/test_at_parse
+tests/*.o
+
+# Core dumps
+core
+core.*
+vgcore.*
