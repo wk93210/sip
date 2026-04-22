@@ -132,23 +132,44 @@ AC_ARG_WITH([asterisk-modules],
 if test -n "$ASTERISK_HEADERS"; then
   ASTERISK_INCLUDE_DIR="$ASTERISK_HEADERS"
 else
-  # Try to find asterisk headers
-  ast_search_paths="/usr/include/asterisk /usr/local/include/asterisk /opt/asterisk/include/asterisk /usr/local/include/asterisk"
-  if test -n "$ASTERISK_PREFIX"; then
-    ast_search_paths="$ASTERISK_PREFIX/include/asterisk $ast_search_paths"
+  # First try pkg-config
+  if pkg-config --exists asterisk 2>/dev/null; then
+    ASTERISK_INCLUDE_DIR=$(pkg-config --variable=includedir asterisk 2>/dev/null)
+    if test -z "$ASTERISK_INCLUDE_DIR"; then
+      # pkg-config doesn't give includedir, try cflags
+      pkg_cflags=$(pkg-config --cflags asterisk 2>/dev/null)
+      for flag in $pkg_cflags; do
+        case $flag in
+          -I*)
+            dir=$(echo "$flag" | sed 's/^-I//')
+            if test -f "$dir/asterisk.h"; then
+              ASTERISK_INCLUDE_DIR="$dir"
+              break
+            fi
+            ;;
+        esac
+      done
+    fi
   fi
 
-  ASTERISK_INCLUDE_DIR=""
-  for dir in $ast_search_paths; do
-    if test -f "$dir/asterisk.h"; then
-      ASTERISK_INCLUDE_DIR="$dir"
-      break
+  # If still not found, try common paths
+  if test -z "$ASTERISK_INCLUDE_DIR"; then
+    ast_search_paths="/usr/include/asterisk /usr/local/include/asterisk /opt/asterisk/include/asterisk"
+    if test -n "$ASTERISK_PREFIX"; then
+      ast_search_paths="$ASTERISK_PREFIX/include/asterisk $ast_search_paths"
     fi
-  done
+
+    for dir in $ast_search_paths; do
+      if test -f "$dir/asterisk.h"; then
+        ASTERISK_INCLUDE_DIR="$dir"
+        break
+      fi
+    done
+  fi
 fi
 
 if test -z "$ASTERISK_INCLUDE_DIR"; then
-  AC_MSG_ERROR([Asterisk headers not found. Use --with-asterisk-headers=DIR])
+  AC_MSG_ERROR([Asterisk headers not found. Install asterisk-dev or use --with-asterisk-headers=DIR])
 fi
 
 AC_MSG_RESULT([$ASTERISK_INCLUDE_DIR])
