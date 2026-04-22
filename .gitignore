@@ -1,21 +1,32 @@
-*.swp
-
+# Build artifacts
 *.o
-*.o.d
+*.so
+*.a
 
-/chan_dongle.so
+# Backup files
+*.bak
+*.orig
+*~
 
-/Makefile
-/aclocal.m4
-/autom4te.cache
-/compile
-/config.guess
-/config.h
-/config.log
-/config.status
-/config.sub
-/configure
-/install-sh
-/missing
-/stamp-h
-/stamp-h1
+# Test files
+ENDTEST
+EOF
+MAKEEOF
+PYEOF
+
+# Autotools
+configure
+Makefile.in~
+autom4te.cache/
+config.cache
+config.h.in~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+.deps/
+*.d

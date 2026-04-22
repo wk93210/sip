@@ -219,7 +219,7 @@ EXPORT_DEF int opentty (const char* dev, char ** lockfile)
 		return -1;
 	}
 
-	fd = open(dev, O_RDWR | O_NOCTTY);
+	fd = open(dev, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (fd < 0)
 	{
 		flags = errno;

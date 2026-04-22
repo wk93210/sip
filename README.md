@@ -1,223 +1,353 @@
-<a href="https://travis-ci.org/wdoekes/asterisk-chan-dongle">
-  <img alt="Travis Build Status"
-       src="https://api.travis-ci.org/wdoekes/asterisk-chan-dongle.svg"/>
-</a>
+# chan_dongle - SIM7600/SIMCOM Channel Driver for Asterisk
 
-chan\_dongle channel driver for Huawei UMTS cards
-=================================================
+Asterisk channel driver for SIM7600 and compatible SIMCOM cellular modules. Supports voice calls, SMS, and USSD on modern Asterisk versions (18/20/22).
 
-WARNING:
+## Features
 
-This channel driver is in alpha stage.
-I am not responsible if this channel driver will eat your money on
-your SIM card or do any unpredicted things.
+- **Voice Calls**: Make and receive calls through the cellular module
+- **SMS**: Send and receive SMS messages
+- **USSD**: Send USSD codes and receive responses
+- **Multiple Devices**: Support for multiple SIM7600 modules
+- **SIM7600 Optimized**: Specifically tested and optimized for SIM7600 modules
+- **Modern Asterisk**: Compatible with Asterisk 18, 20, and 22
 
-Please use a recent Linux kernel, 2.6.33+ recommended.
-If you use FreeBSD, 8.0+ recommended.
+## Hardware Requirements
 
-This channel driver should work with the folowing UMTS cards:
-* Huawei K3715
-* Huawei E169 / K3520
-* Huawei E155X
-* Huawei E175X
-* Huawei E261
-* Huawei K3765
+### Supported Modules
+- **SIM7600E-H** (Primary target, fully tested)
+- SIM7600A-H, SIM7600SA-H, SIM7600JC-H (should work)
+- Other SIMCOM modules with similar AT command set
 
-Check complete list in:
-http://wiki.e1550.mobi/doku.php?id=requirements#list_of_supported_models
+### System Requirements
+- Linux kernel 5.x or newer recommended
+- Asterisk 18.x, 20.x, or 22.x
+- USB port for module connection
+- 256MB RAM minimum, 512MB recommended
 
-Before using the channel driver make sure to:
-* Disable PIN code on your SIM card
+### USB Connection
+The SIM7600 exposes multiple USB serial ports:
+- `/dev/ttyUSB0` - AT command port (primary)
+- `/dev/ttyUSB1` - AT command port (secondary)
+- `/dev/ttyUSB2` - Diagnostic/GPS (not used)
+- `/dev/ttyUSB3` - Diagnostic (not used)
+- `/dev/ttyUSB5` - PCM audio (voice data)
 
-Supported features:
-* Place voice calls and terminate voice calls
-* Send SMS and receive SMS
-* Send and receive USSD commands / messages
+A udev rule typically creates `/dev/ttyUSB-PCM` as a symlink to `/dev/ttyUSB5`.
 
-Some useful AT commands:
+## Installation
 
-    AT+CCWA=0,0,1                   #disable call-waiting
-    AT+CFUN=1,1                     #reset dongle
-    AT^CARDLOCK="<code>"            #unlock code
-    AT^SYSCFG=13,0,3FFFFFFF,0,3     #modem 2G only, automatic search any band, no roaming
-    AT^U2DIAG=0                     #enable modem function
+### Prerequisites
 
-Building:
-----------
+```bash
+# Debian/Ubuntu/Raspberry Pi OS
+sudo apt-get update
+sudo apt-get install -y build-essential libsqlite3-dev asterisk-dev
 
-    $ ./bootstrap
-    $ ./configure --with-astversion=13.7
-    $ make
+# Verify Asterisk headers are installed
+ls /usr/include/asterisk/asterisk.h
+```
 
-If you run a different version of Asterisk, you'll need to update the
-`13.7` as appropriate, obviously.
+### Building from Source
 
-If you did not `make install` Asterisk in the usual location and configure
-cannot find the asterisk header files in `/usr/include/asterisk`, you may
-optionally pass `--with-asterisk=PATH/TO/INCLUDE`.
+```bash
+cd /home/lunanli/sip/chan_dongle-src
+make clean
+make
+sudo make install
+```
 
-Here is an example for the dialplan:
-------------------------------------
+### Configuration
 
-**WARNING**: *This example uses the raw SMS message passed to System() directly.
-No sane person would do that with untrusted data without escaping/removing the
-single quotes.*
+1. Create the dongle configuration:
 
-    [dongle-incoming]
-    exten => sms,1,Verbose(Incoming SMS from ${CALLERID(num)} ${BASE64_DECODE(${SMS_BASE64})})
-    exten => sms,n,System(echo '${STRFTIME(${EPOCH},,%Y-%m-%d %H:%M:%S)} - ${DONGLENAME} - ${CALLERID(num)}: ${BASE64_DECODE(${SMS_BASE64})}' >> /var/log/asterisk/sms.txt)
-    exten => sms,n,Hangup()
+```bash
+sudo nano /etc/asterisk/dongle.conf
+```
 
-    exten => ussd,1,Verbose(Incoming USSD: ${BASE64_DECODE(${USSD_BASE64})})
-    exten => ussd,n,System(echo '${STRFTIME(${EPOCH},,%Y-%m-%d %H:%M:%S)} - ${DONGLENAME}: ${BASE64_DECODE(${USSD_BASE64})}' >> /var/log/asterisk/ussd.txt)
-    exten => ussd,n,Hangup()
+Example configuration for SIM7600:
 
-    exten => s,1,Dial(SIP/2001@othersipserver)
-    exten => s,n,Hangup()
+```ini
+[general]
+interval=15
+timeout=60
 
-    [othersipserver-incoming]
+[dongle0]
+; Device paths - adjust based on your system
+; Use /dev/serial/by-id/... for persistent naming
+data=/dev/ttyUSB0
+audio=/dev/ttyUSB5
 
-    exten => _X.,1,Dial(Dongle/r1/${EXTEN})
-    exten => _X.,n,Hangup
+; Or use the PCM symlink if available
+; audio=/dev/ttyUSB-PCM
 
-    exten => *#123#,1,DongleSendUSSD(dongle0,${EXTEN})
-    exten => *#123#,n,Answer()
-    exten => *#123#,n,Wait(2)
-    exten => *#123#,n,Playback(vm-goodbye)
-    exten => *#123#,n,Hangup()
+; SIM settings
+imei=123456789012345
+imsi=310260123456789
 
-    exten => _#X.,1,DongleSendSMS(dongle0,${EXTEN:1},"Please call me",1440,yes,"magicID")
-    exten => _#X.,n,Answer()
-    exten => _#X.,n,Wait(2)
-    exten => _#X.,n,Playback(vm-goodbye)
-    exten => _#X.,n,Hangup()
+; Audio gain (0-255)
+rxgain=50
+txgain=50
 
-You can also use this:
-----------------------
+; Call waiting
+callwaiting=no
 
-Call using a specific group:
+; SMS settings
+smsbox=/var/spool/asterisk/sms
+```
 
-    exten => _X.,1,Dial(Dongle/g1/${EXTEN})
+2. Set permissions:
 
-Call using a specific group in round robin:
+```bash
+# Add asterisk user to dialout group
+sudo usermod -a -G dialout asterisk
 
-    exten => _X.,1,Dial(Dongle/r1/${EXTEN})
+# Or set appropriate udev rules for device permissions
+```
 
-Call using a specific dongle:
+3. Restart Asterisk:
 
-    exten => _X.,1,Dial(Dongle/dongle0/${EXTEN})
+```bash
+sudo systemctl restart asterisk
+```
 
-Call using a specific provider name:
+4. Verify the module loaded:
 
-    exten => _X.,1,Dial(Dongle/p:PROVIDER NAME/${EXTEN})
+```bash
+sudo asterisk -rx "module show like chan_dongle"
+sudo asterisk -rx "dongle show devices"
+```
 
-Call using a specific IMEI:
+## Dialplan Examples
 
-    exten => _X.,1,Dial(Dongle/i:123456789012345/${EXTEN})
+### Incoming Calls
 
-Call using a specific IMSI prefix:
+```asterisk
+[dongle-incoming]
+exten => s,1,Verbose(Incoming call on ${DONGLENAME})
+ same => n,Set(CALLERID(name)=${CALLERID(num)})
+ same => n,Dial(PJSIP/100,30)
+ same => n,Hangup()
+```
 
-    exten => _X.,1,Dial(Dongle/s:25099203948/${EXTEN})
+### Outgoing Calls
 
-How to store your own number:
+```asterisk
+[outgoing]
+; Dial using dongle0
+exten => _X.,1,Dial(Dongle/dongle0/${EXTEN})
+```
 
-    dongle cmd dongle0 AT+CPBS=\"ON\"
-    dongle cmd dongle0 AT+CPBW=1,\"+123456789\",145
+### SMS Handling
 
+```asterisk
+[dongle-incoming]
+exten => sms,1,Verbose(Incoming SMS from ${CALLERID(num)})
+ same => n,System(echo '${STRFTIME(${EPOCH},,%Y-%m-%d %H:%M:%S)} - ${DONGLENAME} - ${CALLERID(num)}: ${BASE64_DECODE(${SMS_BASE64})}' >> /var/log/asterisk/sms.log)
+ same => n,Hangup()
+```
 
-Other CLI commands:
--------------------
+### USSD Handling
 
-    dongle reset <device>
-    dongle restart gracefully <device>
-    dongle restart now <device>
-    dongle restart when convenient <device>
-    dongle show device <device>
-    dongle show devices
-    dongle show version
-    dongle sms <device> number message
-    dongle ussd <device> ussd
-    dongle stop gracefully <device>
-    dongle stop now <device>
-    dongle stop when convenient <device>
-    dongle start <device>
-    dongle restart gracefully <device>
-    dongle restart now <device>
-    dongle restart when convenient <device>
-    dongle remove gracefully <device>
-    dongle remove now <device>
-    dongle remove when convenient <device>
-    dongle reload gracefully
-    dongle reload now
-    dongle reload when convenient
+```asterisk
+[dongle-incoming]
+exten => ussd,1,Verbose(Incoming USSD: ${BASE64_DECODE(${USSD_BASE64})})
+ same => n,System(echo '${STRFTIME(${EPOCH},,%Y-%m-%d %H:%M:%S)} - ${DONGLENAME}: ${BASE64_DECODE(${USSD_BASE64})}' >> /var/log/asterisk/ussd.log)
+ same => n,Hangup()
+```
 
-For reading installation notes please look to INSTALL file.
+## Applications
 
+### DongleSendSMS
 
-Gain control and Jitter buffer
---------------------------------
+Send SMS from dialplan:
 
+```asterisk
+exten => *123,1,DongleSendSMS(dongle0,+1234567890,Hello World,14400,0,)
+```
 
-<img src="https://cloud.githubusercontent.com/assets/6702424/26686554/9253bc18-46ed-11e7-9bce-cad8e2396435.png" 
-width="800px" height="" />
+Parameters:
+1. Device name (e.g., dongle0)
+2. Destination number
+3. Message text
+4. Validity period (minutes)
+5. Report request (0/1)
+6. Payload (included in delivery report)
 
+### DongleSendUSSD
 
-In order to perform good quality calls you will need to take care of:
+Send USSD code:
 
-* **Automatic gain control**:
+```asterisk
+exten => *222,1,DongleSendUSSD(dongle0,*101#)
+```
 
-chan_dongle does not control the gain of the audio stream it receive.
-This result of Alice hearing Bob's voice loud and noisy.
-It is possible to manually manage the gain in *dongle.conf* but
-the better option is by far to apply automatic gain control with
-the dialplan function AGC.
+### DongleStatus
 
+Check device status:
 
-* **Jitter buffer**:
+```asterisk
+exten => *555,1,DongleStatus(dongle0,STATUS)
+ same => n,Verbose(Status: ${STATUS})
+```
 
-Since asterisk 12 it is no longer possible to enable Jitter buffer
-in dongle.conf it has to be applied in the dialplan.
-The lack of Jitter buffer result in severe loss in the transport
-of the voice from Bob to Alice. 
+## CLI Commands
 
+```bash
+# Show connected devices
+sudo asterisk -rx "dongle show devices"
 
-#### Dialplan example
+# Show device details
+sudo asterisk -rx "dongle show device dongle0"
 
-To set JITTERBUFFER and AGC in the dialplan on the appropriate channel
-regardless of who is initiating the call we will have to use
-the "b" option of Dial:
+# Send SMS from CLI
+sudo asterisk -rx "dongle sms dongle0 +1234567890 Hello"
 
-b( context^exten^priority )
+# Send USSD from CLI
+sudo asterisk -rx "dongle ussd dongle0 *101#"
 
-Before initiating an outgoing call, Gosub to the specified
-location using the newly created channel. 
+# Reset device
+sudo asterisk -rx "dongle reset dongle0"
 
-The Gosub will be executed for each destination channel."
+# Reload configuration
+sudo asterisk -rx "module reload chan_dongle"
+```
 
-    [from-dongle]
-    ; This will be executed by an indbound Dongle channel ( call initiated on the dongle side )
-    exten => _[+0-9].,1,Dial(SIP/bob,b(from-dongle^outbound^1)) ;
+## Troubleshooting
 
-    ; This will be executed by an outbound SIP channel ( channel generated by dial )
-    exten => outbound,1,Set(JITTERBUFFER(adaptive)=default)
-    same => n,Set(AGC(rx)=4000)
-    same => n,Return()
+### Check Device Detection
 
-    [from-sip]
-    ; This will be executed by an inbound SIP channel ( call initiated on the SIP side )
-    exten => _[+0-9].,1,Set(JITTERBUFFER(adaptive)=2000,1600,120)
-    same => n,Set(AGC(rx)=4000)
-    same => n,Dial(Dongle/i:${IMEI_OF_MY_DONGLE}/${NUMBER_OF_BOB}) 
+```bash
+# List USB devices
+ls -la /dev/ttyUSB*
 
+# Check kernel messages
+dmesg | grep -i "ttyUSB\|simcom\|7600"
 
-Note: To use automatic gain control dialplan function (AGC) you will need
-to compile Asterisk with func_speex ( see in menuselect ). 
-On raspberry Pi you will need to compile and install speex and speexdsp yourself,
-the version of speex provided by the depos does not support AGC.
-(because compiled with fixed point instead of floating point)
-see: [HOWTO](https://gist.github.com/garronej/01f0dac45efe9161969a83890c019efa)
+# Check module state
+sudo asterisk -rx "dongle show device dongle0"
+```
 
+### PCM Audio Issues
 
-For additional information about Huawei dongle usage look to
-chan\_dongle Wiki at http://wiki.e1550.mobi and chan\_dongle project home at
-https://github.com/wdoekes/asterisk-chan-dongle/
+If you see "Write error!" messages:
+
+1. Verify audio device path in dongle.conf
+2. Check permissions on `/dev/ttyUSB5`
+3. Ensure no other process is using the device
+
+Debug logging:
+```bash
+sudo asterisk -rx "core set verbose 5"
+sudo asterisk -rx "core set debug 5"
+sudo tail -f /var/log/asterisk/full | grep -E "DONGLE|Write error"
+```
+
+### Common Issues
+
+**Module won't load:**
+- Check Asterisk version compatibility
+- Verify sqlite3 is installed
+- Check for conflicting modules
+
+**No audio on calls:**
+- Verify audio=/dev/ttyUSB5 in dongle.conf
+- Check `rxgain` and `txgain` settings
+- Ensure PCM device permissions
+
+**SMS not sending:**
+- Check signal strength: `dongle show device dongle0`
+- Verify SIM can send SMS normally
+- Check SMS center number is configured
+
+## Architecture
+
+### Key Components
+
+- **chan_dongle.c** - Main module, device management
+- **channel.c** - Asterisk channel interface, audio I/O
+- **at_command.c** - AT command construction
+- **at_response.c** - AT response parsing
+- **at_queue.c** - Command queue management
+- **mixbuffer.c** - Audio mixing for conference calls
+
+### Audio Flow
+
+```
+Asterisk Channel <-> channel.c <-> mixbuffer.c <-> /dev/ttyUSB5 (PCM)
+```
+
+Frame size: 320 bytes (20ms @ 8kHz 16-bit signed linear)
+
+### AT Command Flow
+
+```
+Dialplan/App <-> at_queue.c <-> at_command.c <-> /dev/ttyUSB0
+                                      ↑
+                              at_response.c (async responses)
+```
+
+## Development
+
+### Building for Development
+
+```bash
+make clean
+make
+sudo cp chan_dongle.so /usr/lib/asterisk/modules/
+sudo asterisk -rx "module reload chan_dongle"
+```
+
+### Running Tests
+
+```bash
+# Enable debug output
+sudo asterisk -rx "core set debug 9"
+sudo asterisk -rx "dongle reset dongle0"
+```
+
+### Code Structure
+
+```
+chan_dongle-src/
+├── app.c/h           - Dialplan applications
+├── at_command.c/h    - AT command generation
+├── at_parse.c/h      - AT response parsing
+├── at_queue.c/h      - Command queue
+├── at_read.c/h       - Device reading
+├── at_response.c/h   - Response handling
+├── chan_dongle.c/h   - Main module
+├── channel.c/h       - Asterisk channel interface
+├── char_conv.c/h     - Character encoding
+├── cli.c/h           - CLI commands
+├── cpvt.c/h          - Call private data
+├── dc_config.c/h     - Device configuration
+├── helpers.c/h       - Utility functions
+├── manager.c/h       - AMI events
+├── mixbuffer.c/h     - Audio mixing
+├── pdu.c/h           - SMS PDU encoding
+├── ringbuffer.c/h    - Ring buffer
+└── smsdb.c/h         - SMS database
+```
+
+## License
+
+This project is licensed under the GPLv2. See LICENSE.txt for details.
+
+## Acknowledgments
+
+- Original chan_dongle by Artem Makhutov, Dmitry Vagin, and bg
+- Quectel support added by various contributors
+- SIM7600 fixes and modern Asterisk compatibility
+
+## Support
+
+For issues, questions, or contributions, please use the GitHub issue tracker.
+
+## Version History
+
+- **v2.0** - SIM7600 optimized release
+  - Fixed PCM write errors with retry logic
+  - Modern Asterisk (18/20/22) compatibility
+  - Improved error messages
+  - Cleaned up build system
+

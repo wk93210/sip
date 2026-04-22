@@ -348,14 +348,16 @@ static void activate_call(struct cpvt* cpvt)
 	}
 
 	/* setup call local write possition */
-	if(!CPVT_TEST_FLAG(cpvt, CALL_FLAG_ACTIVATED))
-	{
-		// FIXME: reset possition?
-		mixb_attach(&pvt->a_write_mixb, &cpvt->mixstream);
-//		rb_init (&cpvt->a_write_rb, cpvt->a_write_buf, sizeof (cpvt->a_write_buf));
-//		cpvt->write = pvt->a_write_rb.write;
-//		cpvt->used = pvt->a_write_rb.used;
-	}
+	// FIX: Always call mixb_attach to ensure mixstream is attached
+	// Previously this was conditional on !CALL_FLAG_ACTIVATED, but
+	// that caused mixb_write to fail silently when the flag was set
+	// but the mixstream was not actually attached.
+	ast_debug (1, "[DONGLE-UL] activate_call: calling mixb_attach for idx %d (already_activated=%d)\n",
+		cpvt->call_idx, CPVT_TEST_FLAG(cpvt, CALL_FLAG_ACTIVATED) ? 1 : 0);
+	mixb_attach(&pvt->a_write_mixb, &cpvt->mixstream);
+//	rb_init (&cpvt->a_write_rb, cpvt->a_write_buf, sizeof (cpvt->a_write_rb));
+//	cpvt->write = pvt->a_write_rb.write;
+//	cpvt->used = pvt->a_write_rb.used;
 
 	if (pvt->audio_fd >= 0)
 	{
@@ -493,7 +495,7 @@ static void iov_write(struct pvt* pvt, int fd, struct iovec * iov, int iovcnt)
 {
 	ssize_t written;
 	ssize_t done = 0;
-	int count = 10;
+	int count = 100;
 
 	while(iovcnt)
 	{
@@ -505,16 +507,18 @@ again:
 			{
 				--count;
 				if(count != 0) {
+					/* Add small delay to allow device buffer to drain - SIM7600 needs this */
+					usleep(1000);
 					goto again;
 				}
-				ast_debug (1, "[%s] Deadlock avoided for write!\n", PVT_ID(pvt));
+				ast_debug (1, "[%s] Deadlock avoided for write! (retried 100 times, errno=%d)\n", PVT_ID(pvt), errno);
 			}
 			break;
 		}
 		else
 		{
 			done += written;
-			count = 10;
+			count = 100;  /* Reset retry count after successful write */
 			do
 			{
 				if((size_t)written >= iov->iov_len)
@@ -535,7 +539,8 @@ again:
 
 	if (done != FRAME_SIZE)
 	{
-		ast_debug (1, "[%s] Write error!\n", PVT_ID(pvt));
+		ast_debug (1, "[%s] Write error! Expected %d, wrote %zd (errno=%d: %s)\n",
+			PVT_ID(pvt), FRAME_SIZE, done, errno, strerror(errno));
 	}
 }
 

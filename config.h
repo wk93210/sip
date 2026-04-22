@@ -1,171 +1,144 @@
-/* config.h.in.  Generated from configure.ac by autoheader.  */
+/* config.h.  Generated manually for build.  */
 
 /* The Asterisk version as configured --with-astversion. */
-#undef ASTERISK_VERSION_NUM
+#define ASTERISK_VERSION_NUM 200190
 
 /* name of asterisk module */
-#undef AST_MODULE
+#define AST_MODULE "chan_dongle"
 
 /* Build Application extensions */
-#undef BUILD_APPLICATIONS
+#define BUILD_APPLICATIONS 1
 
 /* Build Manager extensions */
-#undef BUILD_MANAGER
+#define BUILD_MANAGER 1
 
 /* Define to 1 if you have HAVE_AST_CONTROL_SRCCHANGE in asterisk/frame.h */
-#undef HAVE_AST_CONTROL_SRCCHANGE
+#define HAVE_AST_CONTROL_SRCCHANGE 1
 
 /* Define to 1 if you have the <fcntl.h> header file. */
-#undef HAVE_FCNTL_H
+#define HAVE_FCNTL_H 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#undef HAVE_INTTYPES_H
+#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the 'sqlite3' library (-lsqlite3). */
-#undef HAVE_LIBSQLITE3
+#define HAVE_LIBSQLITE3 1
 
 /* Define to 1 if you have the 'memchr' function. */
-#undef HAVE_MEMCHR
+#define HAVE_MEMCHR 1
 
 /* Define to 1 if you have the 'memmem' function. */
-#undef HAVE_MEMMEM
+#define HAVE_MEMMEM 1
 
 /* Define to 1 if you have the 'memmove' function. */
-#undef HAVE_MEMMOVE
+#define HAVE_MEMMOVE 1
 
 /* Define to 1 if you have the 'memset' function. */
-#undef HAVE_MEMSET
+#define HAVE_MEMSET 1
 
 /* Define to 1 if you have the 'realpath' function. */
-#undef HAVE_REALPATH
+#define HAVE_REALPATH 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#undef HAVE_STDINT_H
+#define HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdio.h> header file. */
-#undef HAVE_STDIO_H
+#define HAVE_STDIO_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-#undef HAVE_STDLIB_H
+#define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the 'strcasecmp' function. */
-#undef HAVE_STRCASECMP
+#define HAVE_STRCASECMP 1
 
 /* Define to 1 if you have the 'strchr' function. */
-#undef HAVE_STRCHR
+#define HAVE_STRCHR 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-#undef HAVE_STRINGS_H
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-#undef HAVE_STRING_H
+#define HAVE_STRING_H 1
 
 /* Define to 1 if you have the 'strncasecmp' function. */
-#undef HAVE_STRNCASECMP
+#define HAVE_STRNCASECMP 1
 
 /* Define to 1 if you have the 'strtol' function. */
-#undef HAVE_STRTOL
+#define HAVE_STRTOL 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#undef HAVE_SYS_STAT_H
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
+#define HAVE_SYS_TIME_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#undef HAVE_SYS_TYPES_H
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <termios.h> header file. */
-#undef HAVE_TERMIOS_H
+#define HAVE_TERMIOS_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#undef HAVE_UNISTD_H
+#define HAVE_UNISTD_H 1
 
 /* Define to const if you has iconv() const declaration of input buffer */
-#undef ICONV_CONST
+#define ICONV_CONST
 
 /* Define to iconv_t if you has iconv_t in iconv.h */
-#undef ICONV_T
+#define ICONV_T iconv_t
 
 /* Define to the address where bug reports for this package should be sent */
-#undef MODULE_BUGREPORT
+#define MODULE_BUGREPORT "https://github.com/bg111/asterisk-chan-dongle/issues"
 
 /* Define to the home page for this package */
-#undef MODULE_URL
+#define MODULE_URL "https://github.com/bg111/asterisk-chan-dongle/"
 
 /* Define to the version of this package */
-#undef MODULE_VERSION
+#define MODULE_VERSION "1.1"
 
 /* Name of package */
-#undef PACKAGE
+#define PACKAGE "chan_dongle"
 
 /* Define to the address where bug reports for this package should be sent. */
-#undef PACKAGE_BUGREPORT
+#define PACKAGE_BUGREPORT "https://github.com/bg111/asterisk-chan-dongle/issues"
 
 /* Define to the full name of this package. */
-#undef PACKAGE_NAME
+#define PACKAGE_NAME "chan_dongle"
 
 /* Revision of package */
-#undef PACKAGE_REVISION
+#define PACKAGE_REVISION "43gh=47cg"
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING
+#define PACKAGE_STRING "chan_dongle 1.1"
 
 /* Define to the one symbol short name of this package. */
-#undef PACKAGE_TARNAME
+#define PACKAGE_TARNAME "chan_dongle"
 
 /* Define to the home page for this package. */
-#undef PACKAGE_URL
+#define PACKAGE_URL "https://github.com/bg111/asterisk-chan-dongle/"
 
 /* Define to the version of this package. */
-#undef PACKAGE_VERSION
+#define PACKAGE_VERSION "1.1"
 
 /* printf format for time_t */
-#undef PRI_time_t
+#define PRI_time_t "ld"
 
 /* The size of 'int', as computed by sizeof. */
-#undef SIZEOF_INT
+#define SIZEOF_INT 4
 
 /* The size of 'long int', as computed by sizeof. */
-#undef SIZEOF_LONG_INT
+#define SIZEOF_LONG_INT 8
 
 /* The size of 'long long int', as computed by sizeof. */
-#undef SIZEOF_LONG_LONG_INT
+#define SIZEOF_LONG_LONG_INT 8
 
 /* The size of 'time_t', as computed by sizeof. */
-#undef SIZEOF_TIME_T
+#define SIZEOF_TIME_T 8
 
 /* Define to 1 if all of the C89 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for
    backward compatibility; new code need not use it. */
-#undef STDC_HEADERS
+#define STDC_HEADERS 1
 
 /* Version number of package */
-#undef VERSION
-
-/* Define for Solaris 2.5.1 so the uint64_t typedef from <sys/synch.h>,
-   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
-   #define below would cause a syntax error. */
-#undef _UINT64_T
-
-/* Build with debugging */
-#undef __DEBUG__
-
-/* Define to empty if 'const' does not conform to ANSI C. */
-#undef const
-
-/* Define to '__inline__' or '__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-#undef inline
-#endif
-
-/* Define as 'unsigned int' if <stddef.h> doesn't define. */
-#undef size_t
-
-/* Define as 'int' if <sys/types.h> doesn't define. */
-#undef ssize_t
-
-/* Define to the type of an unsigned integer type of width exactly 64 bits if
-   such a type exists and the standard includes do not define it. */
-#undef uint64_t
+#define VERSION "1.1"
