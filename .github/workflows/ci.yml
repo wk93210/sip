@@ -60,7 +60,7 @@ jobs:
       - name: Build chan_dongle
         run: |
           ./autogen.sh || true
-          ./configure --with-asterisk=/usr/local
+          ./configure
           make clean
           make
 
