@@ -1,6 +1,6 @@
 # chan_dongle - SIM7600/SIMCOM Channel Driver for Asterisk
 
-Asterisk channel driver for SIM7600 and compatible SIMCOM cellular modules. Supports voice calls, SMS, and USSD on modern Asterisk versions (18/20/22).
+Asterisk channel driver for SIM7600 and compatible SIMCOM cellular modules. Supports voice calls, SMS, and USSD on Asterisk 20.
 
 ## Features
 
@@ -9,7 +9,7 @@ Asterisk channel driver for SIM7600 and compatible SIMCOM cellular modules. Supp
 - **USSD**: Send USSD codes and receive responses
 - **Multiple Devices**: Support for multiple SIM7600 modules
 - **SIM7600 Optimized**: Specifically tested and optimized for SIM7600 modules
-- **Modern Asterisk**: Compatible with Asterisk 18, 20, and 22
+- **Asterisk 20**: Compatible with Asterisk 20.x (previous versions dropped)
 
 ## Hardware Requirements
 
@@ -20,7 +20,7 @@ Asterisk channel driver for SIM7600 and compatible SIMCOM cellular modules. Supp
 
 ### System Requirements
 - Linux kernel 5.x or newer recommended
-- Asterisk 18.x, 20.x, or 22.x
+- **Asterisk 20.x** (only version supported)
 - USB port for module connection
 - 256MB RAM minimum, 512MB recommended
 
@@ -50,26 +50,33 @@ ls /usr/include/asterisk/asterisk.h
 ### Building from Source
 
 ```bash
-cd /home/lunanli/sip/chan_dongle-src
+cd /path/to/chan_dongle-src
 make clean
 make
-sudo make install
+sudo cp chan_dongle.so /usr/lib/asterisk/modules/
 ```
 
 ### Configuration
 
-1. Create the dongle configuration:
+Sample configuration files are provided in the `etc/` directory:
 
 ```bash
-sudo nano /etc/asterisk/dongle.conf
+# Copy sample configuration files
+sudo cp etc/dongle.conf /etc/asterisk/dongle.conf
+sudo cp etc/extensions.conf /etc/asterisk/extensions.d/dongle.conf
 ```
 
-Example configuration for SIM7600:
+Then edit `/etc/asterisk/dongle.conf` to match your device:
 
 ```ini
 [general]
 interval=15
-timeout=60
+smsdb=/var/lib/asterisk/smsdb
+
+[defaults]
+context=dongle-incoming
+rxgain=0
+txgain=0
 
 [dongle0]
 ; Device paths - adjust based on your system
@@ -80,22 +87,24 @@ audio=/dev/ttyUSB5
 ; Or use the PCM symlink if available
 ; audio=/dev/ttyUSB-PCM
 
-; SIM settings
-imei=123456789012345
-imsi=310260123456789
+; SIM identification (optional - used for auto-discovery)
+;imei=123456789012345
+;imsi=310260123456789
 
-; Audio gain (0-255)
+; Audio gain (-100 to 100)
 rxgain=50
 txgain=50
 
 ; Call waiting
 callwaiting=no
 
-; SMS settings
-smsbox=/var/spool/asterisk/sms
+; Auto-delete SMS after reading
+autodeletesms=yes
 ```
 
-2. Set permissions:
+See `etc/dongle.conf` for more configuration options including jitter buffer settings.
+
+### Set Permissions
 
 ```bash
 # Add asterisk user to dialout group
@@ -104,13 +113,13 @@ sudo usermod -a -G dialout asterisk
 # Or set appropriate udev rules for device permissions
 ```
 
-3. Restart Asterisk:
+### Restart Asterisk
 
 ```bash
 sudo systemctl restart asterisk
 ```
 
-4. Verify the module loaded:
+### Verify the Module Loaded
 
 ```bash
 sudo asterisk -rx "module show like chan_dongle"
@@ -118,6 +127,8 @@ sudo asterisk -rx "dongle show devices"
 ```
 
 ## Dialplan Examples
+
+Sample dialplan examples are provided in `etc/extensions.conf`. Key examples:
 
 ### Incoming Calls
 
@@ -155,6 +166,12 @@ exten => ussd,1,Verbose(Incoming USSD: ${BASE64_DECODE(${USSD_BASE64})})
  same => n,Hangup()
 ```
 
+See `etc/extensions.conf` for more dialplan examples including:
+- Subscriber number routing
+- DongleStatus application usage
+- Channel function usage (callstate, dtmf)
+- Conference and hold options
+
 ## Applications
 
 ### DongleSendSMS
@@ -189,6 +206,11 @@ Check device status:
 exten => *555,1,DongleStatus(dongle0,STATUS)
  same => n,Verbose(Status: ${STATUS})
 ```
+
+Status values:
+- `1` - Device not found
+- `2` - Device connected and free
+- `3` - Device connected and in use
 
 ## CLI Commands
 
@@ -245,7 +267,7 @@ sudo tail -f /var/log/asterisk/full | grep -E "DONGLE|Write error"
 ### Common Issues
 
 **Module won't load:**
-- Check Asterisk version compatibility
+- Check Asterisk version (must be 20.x)
 - Verify sqlite3 is installed
 - Check for conflicting modules
 
@@ -321,6 +343,7 @@ chan_dongle-src/
 ├── cli.c/h           - CLI commands
 ├── cpvt.c/h          - Call private data
 ├── dc_config.c/h     - Device configuration
+├── etc/              - Sample configuration files
 ├── helpers.c/h       - Utility functions
 ├── manager.c/h       - AMI events
 ├── mixbuffer.c/h     - Audio mixing
@@ -345,9 +368,13 @@ For issues, questions, or contributions, please use the GitHub issue tracker.
 
 ## Version History
 
-- **v2.0** - SIM7600 optimized release
-  - Fixed PCM write errors with retry logic
-  - Modern Asterisk (18/20/22) compatibility
-  - Improved error messages
-  - Cleaned up build system
-
+- **v2.0** - SIM7600 optimized release, Asterisk 20 only
+  - Dropped support for Asterisk 14/16/18 (Asterisk 20 only)
+  - Removed all ASTERISK_VERSION_NUM preprocessor checks
+  - Fixed PCM write errors with retry logic and usleep delays
+  - Added SIM7600-specific "VOICE CALL: BEGIN/END" handling
+  - SIMCOM auto-detection via AT+CGMI
+  - Cleaned up build system (removed autotools, using modern Makefile)
+  - Removed dead code: contrib/, test/, tools/, BUGS, TODO.txt
+  - Updated documentation with sample config files
+  - Fixed build for modern glibc/GCC compatibility
