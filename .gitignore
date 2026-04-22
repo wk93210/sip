@@ -7,19 +7,21 @@
 .libs/
 .deps/
 
-# Autotools generated (keep these in repo for convenience)
-# Makefile (generated from Makefile.am - but we keep a static Makefile for simplicity)
-# configure (generated from configure.ac)
-# Makefile.in
-# aclocal.m4
-# config.h.in
-# compile
-# config.guess
-# config.sub
-# depcomp
-# install-sh
-# ltmain.sh
-# missing
+# Autotools generated files
+Makefile
+Makefile.in
+aclocal.m4
+config.h.in
+configure
+configure~
+compile
+config.guess
+config.sub
+depcomp
+install-sh
+ltmain.sh
+missing
+test-driver
 
 # Build generated files
 config.h
@@ -62,3 +64,9 @@ tests/*.o
 core
 core.*
 vgcore.*
+# Additional build artifacts
+.dirstamp
+autom4te.cache/
+tests/test-suite.log
+tests/test_at_parse.log
+tests/test_at_parse.trs

@@ -689,7 +689,6 @@ static int pdiscovery_check_device(const char *name, int len,
               "[%s discovery] should ports <-> interfaces map for %04x:%04x "
               "voice=%02x data=%02x\n",
               req->name, device->vendor_id, device->product_id,
-              //			device->interfaces[INTERFACE_TYPE_COM],
               device->interfaces[INTERFACE_TYPE_VOICE],
               device->interfaces[INTERFACE_TYPE_DATA]);
     pdiscovery_interfaces(req->name, name2, len2, device, &res->ports);

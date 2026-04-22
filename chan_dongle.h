@@ -199,14 +199,9 @@ typedef struct pvt {
 
   unsigned int terminate_monitor : 1; /*!< non-zero if we want terminate monitor
                                          thread i.e. restart, stop, remove */
-                                      //	unsigned int		off:1;				/*!< device not
-  //used */ 	unsigned int		prevent_new:1;			/*!<
-  //prevent new usage */
 
   unsigned int
       has_subscriber_number : 1; /*!< subscriber_number field is valid */
-  //	unsigned int		monitor_running:1;		/*!< true if
-  //monitor thread is running */
   unsigned int
       must_remove : 1; /*!< mean must removed from list: NOT FULLY THREADSAFE */
 
