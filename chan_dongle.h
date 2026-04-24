@@ -196,6 +196,7 @@ typedef struct pvt {
       has_voice_quectel : 1, /*!< device has Quectel voice call support */
       has_voice_simcom : 1;  /*!< device has SIMCOM voice call support */
   unsigned int has_call_waiting : 1; /*!< call waiting enabled on device */
+  unsigned int pcm_enabled : 1; /*!< SIM7600 PCM audio is enabled across calls */
 
   unsigned int group_last_used : 1; /*!< mark the last used device */
   unsigned int prov_last_used : 1;  /*!< mark the last used device */

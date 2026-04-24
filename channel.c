@@ -240,10 +240,11 @@ static void disactivate_call(struct cpvt* cpvt)
 		ast_channel_set_fd (cpvt->channel, 0, -1);
 		CPVT_RESET_FLAGS(cpvt, CALL_FLAG_ACTIVATED | CALL_FLAG_MASTER);
 
-		/* Send AT+CPCMREG=0 to properly reset audio state for next call */
+		/* Keep PCM enabled between calls to avoid SIM7600 USB re-enumeration.
+		 * AT+CPCMREG=0 triggers a USB port reset that causes an 11-second
+		 * blackout during which rapid re-dial fails. */
 		if (pvt->has_voice_simcom) {
-			at_enqueue_pcmreg(cpvt, 0);
-			CPVT_RESET_FLAGS(cpvt, CALL_FLAG_PCM_ENABLED);
+			ast_debug(3, "[%s] SIM7600: skipping AT+CPCMREG=0 to avoid USB reset\n", PVT_ID(pvt));
 		}
 
 		ast_debug (6, "[%s] call idx %d disactivated\n", PVT_ID(pvt), cpvt->call_idx);
@@ -1094,16 +1095,24 @@ EXPORT_DEF void change_channel_state(struct cpvt * cpvt, unsigned newstate, int 
 						PVT_ID(pvt), pvt->has_voice_simcom,
 						CPVT_TEST_FLAG(cpvt, CALL_FLAG_PCM_ENABLED) ? 1 : 0, oldstate);
 					if (pvt->has_voice_simcom && !CPVT_TEST_FLAG(cpvt, CALL_FLAG_PCM_ENABLED)) {
-						/* For incoming calls, the SIM7600 may need a brief moment
-						 * after VOICE CALL: BEGIN before accepting AT+CPCMREG=1.
-						 * A short delay here avoids the rapid retry storm. */
-						if (cpvt->dir == CALL_DIR_INCOMING) {
-							usleep(200000);
+						if (pvt->pcm_enabled) {
+							/* PCM was already enabled by a previous call and never
+							 * disabled to avoid USB re-enumeration. Set the flag
+							 * immediately so audio activation proceeds. */
+							CPVT_SET_FLAGS(cpvt, CALL_FLAG_PCM_ENABLED);
+							ast_debug(1, "[%s] SIM7600: PCM already enabled, skipping AT+CPCMREG=1\n", PVT_ID(pvt));
+						} else {
+							/* For incoming calls, the SIM7600 may need a brief moment
+							 * after VOICE CALL: BEGIN before accepting AT+CPCMREG=1.
+							 * A short delay here avoids the rapid retry storm. */
+							if (cpvt->dir == CALL_DIR_INCOMING) {
+								usleep(200000);
+							}
+							at_enqueue_pcmreg(cpvt, 1);
+							/* Don't set CALL_FLAG_PCM_ENABLED here; wait for OK response
+							 * so we can retry if the modem rejects it. */
+							ast_debug(1, "[%s] SIM7600: enabling PCM audio with AT+CPCMREG=1\n", PVT_ID(pvt));
 						}
-						at_enqueue_pcmreg(cpvt, 1);
-						/* Don't set CALL_FLAG_PCM_ENABLED here; wait for OK response
-						 * so we can retry if the modem rejects it. */
-						ast_debug(1, "[%s] SIM7600: enabling PCM audio with AT+CPCMREG=1\n", PVT_ID(pvt));
 					}
 					activate_call(cpvt);
 					if (oldstate == CALL_STATE_ONHOLD)

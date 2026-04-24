@@ -281,6 +281,7 @@ static void disconnect_dongle(struct pvt *pvt) {
 
   pvt->dtmf_digit = 0;
   pvt->rings = 0;
+  pvt->pcm_enabled = 0;
 
   //	else
   {
@@ -477,13 +478,251 @@ static void *do_monitor_phone(void *data) {
         (pvt->audio_tx_fd >= 0 && port_status(pvt->audio_tx_fd))) {
       /* SIM7600 resets USB ports after voice calls - retry before giving up */
       port_error_count++;
-      if (port_error_count < 200) {  /* Retry for 20 seconds (100 * 100ms) */
+      if (port_error_count < 20) {  /* Retry for 2 seconds (20 * 100ms) */
         ast_mutex_unlock(&pvt->lock);
         usleep(100000);  /* 100ms */
         continue;
       }
-      ast_log(LOG_ERROR, "[%s] Lost connection to Dongle (port errors for 20 seconds)\n", dev);
-      goto e_cleanup;
+      /* Attempt soft reconnect before full disconnect/re-init */
+      ast_log(LOG_WARNING, "[%s] USB port reset detected, attempting soft reconnect...\n", dev);
+
+      /* Close stale fds */
+      closetty(pvt->data_fd, &pvt->dlock);
+      closetty(pvt->audio_fd, &pvt->alock);
+      if (pvt->audio_tx_fd >= 0)
+        closetty(pvt->audio_tx_fd, &pvt->audio_tx_lock);
+      pvt->data_fd = -1;
+      pvt->audio_fd = -1;
+      pvt->audio_tx_fd = -1;
+
+      /* Reopen data tty */
+      pvt->data_fd = opentty(PVT_STATE(pvt, data_tty), &pvt->dlock);
+      if (pvt->data_fd < 0) {
+        ast_log(LOG_ERROR, "[%s] Soft reconnect failed: cannot reopen data tty\n", dev);
+        goto e_cleanup;
+      }
+
+      /* Reopen audio tty */
+      pvt->audio_fd = opentty(PVT_STATE(pvt, audio_tty), &pvt->alock);
+      if (pvt->audio_fd < 0) {
+        closetty(pvt->data_fd, &pvt->dlock);
+        pvt->data_fd = -1;
+        ast_log(LOG_ERROR, "[%s] Soft reconnect failed: cannot reopen audio tty\n", dev);
+        goto e_cleanup;
+      }
+
+      /* Reopen audio tx tty if configured */
+      if (PVT_STATE(pvt, audio_tx_tty)[0] != '\0') {
+        pvt->audio_tx_fd = opentty(PVT_STATE(pvt, audio_tx_tty), &pvt->audio_tx_lock);
+        if (pvt->audio_tx_fd < 0) {
+          closetty(pvt->audio_fd, &pvt->alock);
+          closetty(pvt->data_fd, &pvt->dlock);
+          pvt->audio_fd = -1;
+          pvt->data_fd = -1;
+          ast_log(LOG_ERROR, "[%s] Soft reconnect failed: cannot reopen audio tx tty\n", dev);
+          goto e_cleanup;
+        }
+      }
+
+      /* Update local fd copy */
+      fd = pvt->data_fd;
+
+      /* Set non-blocking */
+      {
+        long flags;
+        flags = fcntl(pvt->data_fd, F_GETFL);
+        fcntl(pvt->data_fd, F_SETFL, flags | O_NONBLOCK);
+        flags = fcntl(pvt->audio_fd, F_GETFL);
+        fcntl(pvt->audio_fd, F_SETFL, flags | O_NONBLOCK);
+        if (pvt->audio_tx_fd >= 0) {
+          flags = fcntl(pvt->audio_tx_fd, F_GETFL);
+          fcntl(pvt->audio_tx_fd, F_SETFL, flags | O_NONBLOCK);
+        }
+      }
+
+      /* Reapply SIM7600 audio termios: disable CRTSCTS, force 115200.
+       * USB re-enumeration creates a new tty with defaults, so settings
+       * from pvt_start() are lost and must be restored here. */
+      {
+        struct termios audio_term;
+        if (tcgetattr(pvt->audio_fd, &audio_term) == 0) {
+          audio_term.c_cflag &= ~CRTSCTS;
+          audio_term.c_cflag &= ~CBAUD;
+          audio_term.c_cflag |= B115200;
+          if (tcsetattr(pvt->audio_fd, TCSANOW, &audio_term) != 0) {
+            ast_log(LOG_WARNING, "[%s] Soft reconnect: tcsetattr() failed for audio port: %s\n",
+                    dev, strerror(errno));
+          }
+        }
+        if (pvt->audio_tx_fd >= 0 && tcgetattr(pvt->audio_tx_fd, &audio_term) == 0) {
+          audio_term.c_cflag &= ~CRTSCTS;
+          audio_term.c_cflag &= ~CBAUD;
+          audio_term.c_cflag |= B115200;
+          if (tcsetattr(pvt->audio_tx_fd, TCSANOW, &audio_term) != 0) {
+            ast_log(LOG_WARNING, "[%s] Soft reconnect: tcsetattr() failed for audio TX port: %s\n",
+                    dev, strerror(errno));
+          }
+        }
+      }
+
+      /* Clean any stale data from modem */
+      clean_read_data(dev, fd);
+
+      /* Allow SIM7600 firmware a moment to stabilize after TTYs reappear.
+       * Opening too early can yield a valid fd on a not-yet-ready device. */
+      usleep(500000);
+
+      /* Probe modem with AT and wait for OK before resuming command processing.
+       * USB re-enumeration leaves the SIM7600 unresponsive for a variable
+       * amount of time (observed 1-30+ seconds). We retry the AT probe
+       * multiple times rather than using one very long timeout, so we survive
+       * both fast and slow re-enumeration without falling back to full disconnect. */
+      {
+        char probe_buf[256];
+        struct ringbuffer probe_rb;
+        int probe_iovcnt;
+        struct iovec probe_iov[2];
+        int probe_ready = 0;
+        int probe_attempt;
+        int probe_read_result = 0;
+        const int max_probe_attempts = 6;
+
+        for (probe_attempt = 1; probe_attempt <= max_probe_attempts; probe_attempt++) {
+          if (write_all(fd, "AT\r", 3) != 3) {
+            ast_log(LOG_ERROR, "[%s] Soft reconnect failed: cannot write AT probe\n", dev);
+            goto e_cleanup;
+          }
+
+          int probe_t = 10000; /* 10 second timeout per attempt */
+          rb_init(&probe_rb, probe_buf, sizeof(probe_buf));
+          while (at_wait(fd, &probe_t)) {
+            probe_iovcnt = at_read(fd, dev, &probe_rb);
+            if (probe_iovcnt <= 0)
+              break;
+
+            while ((probe_iovcnt = at_read_result_iov(dev, &probe_read_result, &probe_rb, probe_iov)) > 0) {
+              size_t total_len = probe_iov[0].iov_len + probe_iov[1].iov_len;
+              rb_read_upd(&probe_rb, total_len + 1);
+              if (total_len >= 2) {
+                char *line = alloca(total_len + 1);
+                if (probe_iovcnt == 2) {
+                  memcpy(line, probe_iov[0].iov_base, probe_iov[0].iov_len);
+                  memcpy(line + probe_iov[0].iov_len, probe_iov[1].iov_base, probe_iov[1].iov_len);
+                } else {
+                  memcpy(line, probe_iov[0].iov_base, total_len);
+                }
+                line[total_len] = 0;
+                if (strstr(line, "OK") != NULL || strstr(line, "ERROR") != NULL) {
+                  probe_ready = 1;
+                  break;
+                }
+              }
+            }
+            if (probe_ready)
+              break;
+            rb_init(&probe_rb, probe_buf, sizeof(probe_buf));
+          }
+
+          if (probe_ready) {
+            ast_debug(1, "[%s] Soft reconnect: AT probe OK on attempt %d\n", dev, probe_attempt);
+            break;
+          }
+
+          ast_debug(1, "[%s] Soft reconnect: AT probe attempt %d/%d timed out, retrying...\n",
+                    dev, probe_attempt, max_probe_attempts);
+
+          if (probe_attempt < max_probe_attempts) {
+            /* Wait before re-opening TTYs and trying again.
+             * The device node may still point to the old (disconnected)
+             * USB interface; by closing and reopening we ensure we get
+             * the new one once it appears. */
+            closetty(pvt->data_fd, &pvt->dlock);
+            closetty(pvt->audio_fd, &pvt->alock);
+            if (pvt->audio_tx_fd >= 0)
+              closetty(pvt->audio_tx_fd, &pvt->audio_tx_lock);
+            pvt->data_fd = -1;
+            pvt->audio_fd = -1;
+            pvt->audio_tx_fd = -1;
+
+            usleep(2000000); /* 2 second backoff */
+
+            pvt->data_fd = opentty(PVT_STATE(pvt, data_tty), &pvt->dlock);
+            pvt->audio_fd = opentty(PVT_STATE(pvt, audio_tty), &pvt->alock);
+            if (PVT_STATE(pvt, audio_tx_tty)[0] != '\0') {
+              pvt->audio_tx_fd = opentty(PVT_STATE(pvt, audio_tx_tty), &pvt->audio_tx_lock);
+            }
+
+            if (pvt->data_fd < 0 || pvt->audio_fd < 0) {
+              ast_log(LOG_ERROR, "[%s] Soft reconnect failed: cannot reopen TTYs on attempt %d\n",
+                      dev, probe_attempt);
+              goto e_cleanup;
+            }
+
+            fd = pvt->data_fd;
+
+            {
+              long flags;
+              flags = fcntl(pvt->data_fd, F_GETFL);
+              fcntl(pvt->data_fd, F_SETFL, flags | O_NONBLOCK);
+              flags = fcntl(pvt->audio_fd, F_GETFL);
+              fcntl(pvt->audio_fd, F_SETFL, flags | O_NONBLOCK);
+              if (pvt->audio_tx_fd >= 0) {
+                flags = fcntl(pvt->audio_tx_fd, F_GETFL);
+                fcntl(pvt->audio_tx_fd, F_SETFL, flags | O_NONBLOCK);
+              }
+            }
+
+            {
+              struct termios audio_term;
+              if (tcgetattr(pvt->audio_fd, &audio_term) == 0) {
+                audio_term.c_cflag &= ~CRTSCTS;
+                audio_term.c_cflag &= ~CBAUD;
+                audio_term.c_cflag |= B115200;
+                tcsetattr(pvt->audio_fd, TCSANOW, &audio_term);
+              }
+              if (pvt->audio_tx_fd >= 0 && tcgetattr(pvt->audio_tx_fd, &audio_term) == 0) {
+                audio_term.c_cflag &= ~CRTSCTS;
+                audio_term.c_cflag &= ~CBAUD;
+                audio_term.c_cflag |= B115200;
+                tcsetattr(pvt->audio_tx_fd, TCSANOW, &audio_term);
+              }
+            }
+
+            clean_read_data(dev, fd);
+            usleep(500000);
+          }
+        }
+
+        if (!probe_ready) {
+          ast_log(LOG_ERROR, "[%s] Soft reconnect failed: modem did not respond after %d AT probe attempts\n",
+                  dev, max_probe_attempts);
+          goto e_cleanup;
+        }
+      }
+
+      /* NOTE: We intentionally do NOT flush the AT queue here.
+       * A new call may have started dialing during the USB blind window,
+       * and flushing would drop its AT+CLIR/ATD commands. Stale commands
+       * from the previous call (AT+CHUP, AT+CPCMREG=0) are harmless on
+       * the new fd — the modem will respond with ERROR/OK and the queue
+       * will advance normally. */
+
+      /* Poll SMS in case any +CMTI notifications were missed during the blind window */
+      if (at_poll_sms(pvt) == 0) {
+        ast_debug(1, "[%s] Polling SMS messages after soft reconnect\n", dev);
+      }
+
+      /* USB re-enumeration resets the SIM7600 modem state, including PCM audio.
+       * Clear pcm_enabled so the next call will send AT+CPCMREG=1 again. */
+      pvt->pcm_enabled = 0;
+
+      ast_log(LOG_NOTICE, "[%s] Soft reconnect successful, resuming normal operation\n", dev);
+      port_error_count = 0;
+      /* Reset AT response parser — stale data from old fd must not leak into new fd */
+      rb_init(&rb, buf, sizeof(buf));
+      read_result = 0;
+      ast_mutex_unlock(&pvt->lock);
+      continue;
     }
     port_error_count = 0;  /* Reset on success */
 
@@ -509,6 +748,7 @@ static void *do_monitor_phone(void *data) {
                   "[%s] timedout while waiting '%s' in response to '%s', removing from queue\n", dev,
                   at_res2str(ecmd->res), at_cmd2str(ecmd->cmd));
           at_queue_handle_result(pvt, RES_UNKNOWN);
+          at_queue_run(pvt);
           ast_mutex_unlock(&pvt->lock);
           continue;
         }
@@ -556,10 +796,9 @@ e_cleanup:
 
 e_restart:
   disconnect_dongle(pvt);
+  pvt->restart_time = RESTATE_TIME_NOW;
   //	pvt->monitor_running = 0;
   ast_mutex_unlock(&pvt->lock);
-
-  /* TODO: wakeup discovery thread after some delay */
   return NULL;
 }
 
@@ -943,7 +1182,7 @@ static int is_dial_possible2(const struct pvt *pvt, int opts,
   AST_LIST_TRAVERSE(&pvt->chans, cpvt, entry) {
     switch (cpvt->state) {
     case CALL_STATE_INIT:
-      if (cpvt != ignore_cpvt)
+      if (cpvt != ignore_cpvt && cpvt->channel != NULL)
         return 0;
       break;
 

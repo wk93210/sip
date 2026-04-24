@@ -139,6 +139,7 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 				 * whether this was an enable (ACTIVE) or disable (RELEASED/ONHOLD) */
 				if (task->cpvt && task->cpvt->state == CALL_STATE_ACTIVE) {
 					CPVT_SET_FLAGS(task->cpvt, CALL_FLAG_PCM_ENABLED);
+					pvt->pcm_enabled = 1;
 					task->cpvt->pcmreg_retry = 0;
 					ast_debug(1, "[%s] SIM7600 PCM audio enabled flag set\n", PVT_ID(pvt));
 				}
